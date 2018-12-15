@@ -1,9 +1,53 @@
+import pandas as pd
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from time import sleep, strftime
+from random import randint
+import pandas as pd
+import json
 
-hashtag_list = ['travelblog', 'travelblogger', 'traveler']
+# Load hashtag list
+try:
+    f = open("/Users/martin/Documents/Instagram Bot/hashtag_list.txt", "r")
+    contents = f.read().split(',')
+    hashtag_list = [i.strip() for i in contents]
+except:
+    print('Please, create a txt file called hashtag_list in your directory with the hashtag to navigate on')
 
-# prev_user_list = [] - if it's the first time you run it, use this line and comment the two below
-prev_user_list = pd.read_csv('20181203-224633_users_followed_list.csv', delimiter=',').iloc[:,1:2] # useful to build a user log
-prev_user_list = list(prev_user_list['0'])
+# Load the username and password from a JSON file. Otherwise, ask for it
+try:
+    json_data = open('/Users/martin/Documents/Instagram Bot/user.json').read()
+    data = json.loads(json_data)
+    user = input('Enter a user: ')
+except:
+    print('Please, create a txt file called hashtag_list in your directory with the hashtag to navigate on')
+
+# Start navigation
+chromedriver_path = '/anaconda3/bin/chromedriver' # Change this to your own chromedriver path!
+webdriver = webdriver.Chrome(executable_path = chromedriver_path)
+sleep(2)
+
+# Get in the webpage
+webdriver.get('https://www.instagram.com/accounts/login/?source=auth_switcher')
+sleep(3)
+
+# Login
+username = webdriver.find_element_by_name('username')
+username.send_keys(data[user]['username'])
+password = webdriver.find_element_by_name('password')
+password.send_keys(data[user]['password'])
+
+button_login = webdriver.find_element_by_css_selector('#react-root > section > main > div > article > div > div:nth-child(1) > div > form > div:nth-child(3) > button')
+button_login.click()
+sleep(3)
+
+notnow = webdriver.find_element_by_css_selector('body > div:nth-child(13) > div > div > div > div.mt3GC > button.aOOlW.HoLwm')
+notnow.click() #comment these last 2 lines out if you don't get a pop up asking about notifications
+
+
+prev_user_list = [] # if it's the first time you run it, use this line and comment the two below
+#rev_user_list = pd.read_csv('20181203-224633_users_followed_list.csv', delimiter=',').iloc[:,1:2] # useful to build a user log
+#prev_user_list = list(prev_user_list['0'])
 
 new_followed = []
 tag = -1
