@@ -5,6 +5,7 @@ from time import sleep, strftime
 from random import randint
 import pandas as pd
 import json
+from datetime import datetime
 
 # Load hashtag list
 try:
@@ -24,10 +25,11 @@ except:
 
 # Load previous data or create a new list
 try:
-    user_list = list(pd.read_csv('/Users/martin/Documents/Instagram Bot/user_list.csv', header=None)[0])
+    user_list = pd.read_csv('/Users/martin/Documents/Instagram Bot/user_list.csv', header=None)   # load whole database of users connected
+    users_followed = [user_list[1][i] for i in range(0, len(user_list))] # get the list of usernames already followed
 except:
-    print('No user list detected. The code will create a new one after finishing')
-    user_list = []
+    print('No preexisten user list detected. The code will create a new one after finishing')
+    users_followed = []
 
 # Start navigation
 chromedriver_path = '/anaconda3/bin/chromedriver' # Change this to your own chromedriver path!
@@ -51,8 +53,8 @@ sleep(3)
 notnow = webdriver.find_element_by_css_selector('body > div:nth-child(13) > div > div > div > div.mt3GC > button.aOOlW.HoLwm')
 notnow.click() #comment these last 2 lines out if you don't get a pop up asking about notifications
 
+new_followed = []  # list with new users information and connected time
 
-new_followed = []
 tag = -1
 followed = 0
 likes = 0
@@ -61,6 +63,7 @@ comments = 0
 for hashtag in hashtag_list:
     tag += 1
     webdriver.get('https://www.instagram.com/explore/tags/'+ hashtag_list[tag] + '/')  # get in the hashtag webpage
+    print('Starting new hashtag: {}'.format(hashtag))
     sleep(5)
     first_thumbnail = webdriver.find_element_by_xpath('//*[@id="react-root"]/section/main/article/div[1]/div/div/div[1]/div[1]/a/div') # select the first image
 
@@ -71,21 +74,20 @@ for hashtag in hashtag_list:
         for x in range(1, 5):
             username = webdriver.find_element_by_xpath('/html/body/div[3]/div/div[2]/div/article/header/div[2]/div[1]/div[1]/h2/a').text # get the username of the post
 
-            # check if the user is in list
-            if username not in user_list:
+            # check if the user is in list. In that case, next picture
+            if username not in users_followed:
 
-                # If we already follow, do not unfollow
+                # If we already follow, do not unfollow and next picture
                 if webdriver.find_element_by_xpath('/html/body/div[3]/div/div[2]/div/article/header/div[2]/div[1]/div[2]/button').text == 'Follow':
 
                     webdriver.find_element_by_xpath('/html/body/div[3]/div/div[2]/div/article/header/div[2]/div[1]/div[2]/button').click() # follow the user
 
-                    new_followed.append(username) # append in the username list
                     followed += 1
 
                     # Liking the picture
                     button_like = webdriver.find_element_by_xpath('/html/body/div[3]/div/div[2]/div/article/div[2]/section[1]/span[1]/button/span')
-
                     button_like.click()
+
                     likes += 1
                     sleep(randint(18,25))
 
@@ -94,29 +96,38 @@ for hashtag in hashtag_list:
                     print('{}_{}: {}'.format(hashtag, x, comm_prob))  # print the hashtag, num of iteration and comment probability
                     if comm_prob > 7:
                         comments += 1
-
                         webdriver.find_element_by_xpath('/html/body/div[3]/div/div[2]/div/article/div[2]/section[1]/span[2]/button/span').click()       # do a click in the comment button
                         comment_box = webdriver.find_element_by_xpath('/html/body/div[3]/div/div[2]/div/article/div[2]/section[3]/div/form/textarea')    # find the comment area
 
+                        # Select the comment based on the probability
                         if (comm_prob < 7):
-                            comment_box.send_keys('Really cool!')
+                            message = 'Really cool!'
+                            comment_box.send_keys(message)
                             sleep(1)
                         elif (comm_prob >= 7) and (comm_prob < 9):
-                            comment_box.send_keys('Nice work :)')
+                            message = 'Nice work :)'
+                            comment_box.send_keys(message)
                             sleep(1)
                         elif comm_prob == 9:
-                            comment_box.send_keys('Nice gallery!!')
+                            message = 'Nice gallery!!'
+                            comment_box.send_keys(message)
                             sleep(1)
                         elif comm_prob == 10:
-                            comment_box.send_keys('So cool! :)')
+                            message = 'So cool! :)'
+                            comment_box.send_keys(message)
                             sleep(1)
+
                         # Enter to post comment
                         comment_box.send_keys(Keys.ENTER)
                         sleep(randint(22,28))
 
+                    tupla = (username, str(datetime.now()), message, comm_prob)
+                    new_followed.append(tupla)
+
                 # Next picture
                 webdriver.find_element_by_link_text('Next').click()
                 sleep(randint(25,29))
+
             else:
                 webdriver.find_element_by_link_text('Next').click()
                 sleep(randint(20,26))
@@ -124,14 +135,18 @@ for hashtag in hashtag_list:
     # some hashtag stops refreshing photos (it may happen sometimes), it continues to the next
     except:
         continue  # starts all again with the next hashtag
-# Append new users to the list
-for n in range(0, len(new_followed)):
-    if new_followed[n] not in user_list:
-        user_list.append(new_followed[n])
 
-# Save list of followed users in a csv
-user_list = pd.DataFrame(user_list)
-user_list.to_csv('user_list.csv')
+# Append new users to the list (Should not be necessary since we are already looking at the list before continuing)
+#for n in range(0, len(new_followed)):
+#    if new_followed[n][0] not in users_followed:
+#        user_list.append(new_followed[n])
+
+# Save list of followed users in a csv. In case it exist, append new information. Else, new file
+try:
+    user_list = user_list.append(list(new_followed))
+except:
+    user_list = pd.DataFrame(new_followed)
+user_list.set_index(0).to_csv('user_list.csv', header=False)
 
 print('Liked {} photos.'.format(likes))
 print('Commented {} photos.'.format(comments))
